@@ -20,9 +20,10 @@ class GSC_Email_Manager {
 
         $sql = "CREATE TABLE $this->table_name (
             id mediumint(9) NOT NULL AUTO_INCREMENT,
-            email varchar(100) NOT NULL,
+            email varchar(100) NOT NULL UNIQUE,
             name varchar(100),
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id)
         ) $charset_collate;";
 
@@ -33,17 +34,32 @@ class GSC_Email_Manager {
     public function add_email($email, $name = '') {
         global $wpdb;
 
-        return $wpdb->insert(
-            $this->table_name,
-            array(
-                'email' => $email,
-                'name' => $name,
-            ),
-            array(
-                '%s',
-                '%s'
-            )
-        );
+        $existing_email = $this->get_email($email);
+
+        if ($existing_email) {
+            // Email already exists, update the name and updated_at timestamp
+            $result = $wpdb->update(
+                $this->table_name,
+                array('name' => $name, 'updated_at' => current_time('mysql')),
+                array('email' => $email),
+                array('%s', '%s'),
+                array('%s')
+            );
+            return $result !== false; // Return true if update was successful
+        } else {
+            // Email doesn't exist, insert new record
+            $result = $wpdb->insert(
+                $this->table_name,
+                array(
+                    'email' => $email,
+                    'name' => $name,
+                    'created_at' => current_time('mysql'),
+                    'updated_at' => current_time('mysql')
+                ),
+                array('%s', '%s', '%s', '%s')
+            );
+            return $result !== false; // Return true if insert was successful
+        }
     }
 
     public function get_emails($limit = 100, $offset = 0) {
@@ -55,7 +71,7 @@ class GSC_Email_Manager {
 
     public function get_email($email) {
         global $wpdb;
-    
+
         $sql = $wpdb->prepare("SELECT * FROM $this->table_name WHERE email = %s", $email);
         return $wpdb->get_row($sql);
     }
