@@ -1,53 +1,72 @@
 <?php
-
-class EmailManager {
+/**
+ * Class GSC_Email_Manager
+ * Handles email storage and management
+ */
+class GSC_Email_Manager {
+    private $table_name;
 
     public function __construct() {
-        add_action('admin_menu', array($this, 'add_email_management_page'));
+        global $wpdb;
+        $this->table_name = $wpdb->prefix . 'gsc_emails';
+
+        add_action('init', array($this, 'create_table'));
     }
 
-    // Create admin page to display and export emails
-    public function add_email_management_page() {
-        add_submenu_page(
-            'google-sign-collect',
-            'Collected Emails',
-            'Collected Emails',
-            'manage_options',
-            'google-sign-collect-emails',
-            array($this, 'render_email_page')
+    public function create_table() {
+        global $wpdb;
+
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $sql = "CREATE TABLE $this->table_name (
+            id mediumint(9) NOT NULL AUTO_INCREMENT,
+            email varchar(100) NOT NULL,
+            name varchar(100),
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id)
+        ) $charset_collate;";
+
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+
+    public function add_email($email, $name = '') {
+        global $wpdb;
+
+        return $wpdb->insert(
+            $this->table_name,
+            array(
+                'email' => $email,
+                'name' => $name,
+            ),
+            array(
+                '%s',
+                '%s'
+            )
         );
     }
 
-    // Render the collected emails
-    public function render_email_page() {
+    public function get_emails($limit = 100, $offset = 0) {
         global $wpdb;
-        $table = $wpdb->prefix . 'google_sign_collect_emails';
-        $emails = $wpdb->get_results("SELECT * FROM $table");
 
-        echo '<h2>Collected Emails</h2>';
-        echo '<textarea readonly>';
-        foreach ($emails as $email) {
-            echo $email->email . "\n";
-        }
-        echo '</textarea>';
-        
-        // Export button
-        echo '<a href="' . admin_url('admin-post.php?action=export_emails_csv') . '" class="button">Export as CSV</a>';
+        $sql = $wpdb->prepare("SELECT * FROM $this->table_name ORDER BY created_at DESC LIMIT %d OFFSET %d", $limit, $offset);
+        return $wpdb->get_results($sql);
     }
 
-    // Export emails as CSV
-    public function export_emails_csv() {
+    public function export_csv() {
         global $wpdb;
-        $table = $wpdb->prefix . 'google_sign_collect_emails';
-        $emails = $wpdb->get_results("SELECT * FROM $table");
 
+        $emails = $wpdb->get_results("SELECT * FROM $this->table_name ORDER BY created_at DESC", ARRAY_A);
+
+        $filename = 'email_list_' . date('Y-m-d') . '.csv';
         header('Content-Type: text/csv');
-        header('Content-Disposition: attachment; filename="collected-emails.csv"');
-        $output = fopen('php://output', 'w');
-        fputcsv($output, array('Email'));
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
 
-        foreach ($emails as $email) {
-            fputcsv($output, array($email->email));
+        $output = fopen('php://output', 'w');
+        fputcsv($output, array('Email', 'Name', 'Date'));
+
+        foreach ($emails as $row) {
+            fputcsv($output, array($row['email'], $row['name'], $row['created_at']));
         }
 
         fclose($output);

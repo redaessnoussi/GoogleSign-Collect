@@ -1,66 +1,52 @@
 <?php
+class GSC_Google_Auth {
+    private $client_id;
 
-class GoogleAuth {
-
-    private $client_id = 'YOUR_GOOGLE_CLIENT_ID';
-    private $client_secret = 'YOUR_GOOGLE_CLIENT_SECRET';
-    private $redirect_uri;
-    
     public function __construct() {
-        $this->redirect_uri = admin_url('admin.php?page=google-sign-collect');
+        $this->client_id = get_option('gsc_google_client_id');
+        add_action('wp_ajax_gsc_verify_google_token', array($this, 'verify_google_token'));
+        add_action('wp_ajax_nopriv_gsc_verify_google_token', array($this, 'verify_google_token'));
     }
 
-    // Initiates Google login process
-    public function initiate_google_login() {
-        $google_login_url = "https://accounts.google.com/o/oauth2/auth?" . http_build_query([
-            'client_id' => $this->client_id,
-            'redirect_uri' => $this->redirect_uri,
-            'response_type' => 'code',
-            'scope' => 'email profile',
-        ]);
+    public function verify_google_token() {
+        $token = $_POST['token'];
 
-        wp_redirect($google_login_url);
-        exit;
-    }
+        $client = new WP_Http();
+        $response = $client->get("https://oauth2.googleapis.com/tokeninfo?id_token={$token}");
 
-    // Handle Google response and get user email
-    public function handle_google_response() {
-        if (isset($_GET['code'])) {
-            $code = sanitize_text_field($_GET['code']);
-            // Exchange code for access token
-            $token_url = "https://accounts.google.com/o/oauth2/token";
-            $response = wp_remote_post($token_url, array(
-                'body' => array(
-                    'client_id' => $this->client_id,
-                    'client_secret' => $this->client_secret,
-                    'redirect_uri' => $this->redirect_uri,
-                    'code' => $code,
-                    'grant_type' => 'authorization_code',
-                )
-            ));
-
-            $body = wp_remote_retrieve_body($response);
-            $data = json_decode($body);
-
-            if (isset($data->access_token)) {
-                $user_info = $this->get_google_user_info($data->access_token);
-                // Store email
-                $this->store_user_email($user_info->email);
-            }
+        if (is_wp_error($response)) {
+            wp_send_json_error('Failed to verify token');
+            return;
         }
-    }
 
-    // Get user info from Google
-    public function get_google_user_info($token) {
-        $user_info_url = "https://www.googleapis.com/oauth2/v1/userinfo?access_token=$token";
-        $response = wp_remote_get($user_info_url);
-        return json_decode(wp_remote_retrieve_body($response));
-    }
+        $body = json_decode(wp_remote_retrieve_body($response), true);
 
-    // Store user email in database
-    public function store_user_email($email) {
-        global $wpdb;
-        $table = $wpdb->prefix . 'google_sign_collect_emails';
-        $wpdb->insert($table, array('email' => sanitize_email($email)));
+        if (isset($body['error'])) {
+            wp_send_json_error('Invalid token');
+            return;
+        }
+
+        if ($body['aud'] !== $this->client_id) {
+            wp_send_json_error('Token client ID does not match');
+            return;
+        }
+
+        // Token is valid, you can now use the user information
+        $user_email = $body['email'];
+        $user_name = $body['name'];
+
+        // Store user info in session
+        $_SESSION['gsc_user_email'] = $user_email;
+        $_SESSION['gsc_user_name'] = $user_name;
+
+        // Save email to database
+        $email_manager = new GSC_Email_Manager();
+        $result = $email_manager->add_email($user_email, $user_name);
+
+        if (!$result) {
+            error_log('Failed to save email: ' . $user_email);
+        }
+
+        wp_send_json_success('Authentication successful');
     }
 }

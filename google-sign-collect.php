@@ -1,72 +1,118 @@
 <?php
 /**
- * Plugin Name: GoogleSign Collect
- * Description: Custom landing page with Google login to collect user emails and export them as CSV.
- * Version: 1.0
+ * Plugin Name: Google Sign-In and Email Collection
+ * Plugin URI: http://example.com/google-sign-collect
+ * Description: A WordPress plugin for creating landing pages with Google Sign-In and email collection.
+ * Version: 1.0.0
  * Author: Your Name
+ * Author URI: http://example.com
+ * License: GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  */
 
-// Exit if accessed directly
-if (!defined('ABSPATH')) {
-    exit;
+// If this file is called directly, abort.
+if (!defined('WPINC')) {
+    die;
 }
 
-// Include necessary files
-require_once plugin_dir_path(__FILE__) . 'includes/class-google-auth.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-landing-page.php';
-require_once plugin_dir_path(__FILE__) . 'includes/class-email-manager.php';
+// Define plugin constants
+define('GSC_VERSION', '1.0.0');
+define('GSC_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('GSC_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Initialize plugin
-class GoogleSignCollect {
+// Include required files
+require_once GSC_PLUGIN_DIR . 'includes/class-google-auth.php';
+require_once GSC_PLUGIN_DIR . 'includes/class-email-manager.php';
+require_once GSC_PLUGIN_DIR . 'includes/class-landing-page.php';
+require_once GSC_PLUGIN_DIR . 'admin-page.php'; // Add this line
 
-    public function __construct() {
-        add_action('admin_menu', array($this, 'register_admin_menu'));
-        add_action('init', array($this, 'handle_google_login'));
-    }
 
-    // Register admin menu
-    public function register_admin_menu() {
-        add_menu_page(
-            'GoogleSign Collect',
-            'GoogleSign Collect',
-            'manage_options',
-            'google-sign-collect',
-            array($this, 'admin_page'),
-            'dashicons-email-alt',
-            25
-        );
-    }
+// Initialize the plugin
+function gsc_init() {
+    $google_auth = new GSC_Google_Auth();
+    $email_manager = new GSC_Email_Manager();
+    $landing_page = new GSC_Landing_Page();
 
-    // Admin page content
-    public function admin_page() {
-        echo '<div class="wrap"><h1>GoogleSign Collect Settings</h1>';
-        // Handle Google API setup, emails display, and export options here
-    }
+    // Add admin menu
+    add_action('admin_menu', 'gsc_add_admin_menu');
 
-    public function handle_google_login() {
-        // Handle Google login process here
-    }
+    // Register settings
+    add_action('admin_init', 'gsc_register_settings');
 
+    // Enqueue admin styles
+    add_action('admin_enqueue_scripts', 'gsc_enqueue_admin_styles');
+}
+add_action('plugins_loaded', 'gsc_init');
+
+// Add admin menu
+function gsc_add_admin_menu() {
+    add_menu_page(
+        'Google Sign-In & Collect',
+        'GS Collect',
+        'manage_options',
+        'google-sign-collect',
+        'gsc_admin_page',
+        'dashicons-email-alt',
+        30
+    );
 }
 
-// Initialize plugin
-new GoogleSignCollect();
+function gsc_start_session() {
+    if (!session_id()) {
+        session_start();
+    }
+}
+add_action('init', 'gsc_start_session', 1);
 
-// Create the database table for storing emails on plugin activation
-register_activation_hook(__FILE__, 'google_sign_collect_create_table');
+// Register plugin settings
+function gsc_register_settings() {
+    register_setting('gsc_settings', 'gsc_google_client_id');
+    register_setting('gsc_settings', 'gsc_google_client_secret');
+    register_setting('gsc_settings', 'gsc_thank_you_url');
+}
 
-function google_sign_collect_create_table() {
-    global $wpdb;
-    $table_name = $wpdb->prefix . 'google_sign_collect_emails';
-    
-    $charset_collate = $wpdb->get_charset_collate();
-    
-    $sql = "CREATE TABLE $table_name (
-        id mediumint(9) NOT NULL AUTO_INCREMENT,
-        email varchar(255) NOT NULL,
-        PRIMARY KEY (id)
-    ) $charset_collate;";
-    
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-    dbDelta($sql);
+// Enqueue admin styles
+function gsc_enqueue_admin_styles() {
+    wp_enqueue_style('gsc-admin-style', GSC_PLUGIN_URL . 'assets/css/admin-style.css', array(), GSC_VERSION);
+}
+
+function gsc_activate() {
+    // Activation tasks go here
+    gsc_register_post_type();
+    flush_rewrite_rules();
+}
+register_activation_hook(__FILE__, 'gsc_activate');
+
+function gsc_deactivate() {
+    // Deactivation tasks go here
+    flush_rewrite_rules();
+}
+register_deactivation_hook(__FILE__, 'gsc_deactivate');
+
+function gsc_register_post_type() {
+    $landing_page = new GSC_Landing_Page();
+    $landing_page->register_post_type();
+}
+add_action('init', 'gsc_register_post_type');
+
+add_action('wp_ajax_gsc_save_email', 'gsc_save_email');
+add_action('wp_ajax_nopriv_gsc_save_email', 'gsc_save_email');
+
+function gsc_save_email() {
+    if (isset($_POST['formData'])) {
+        parse_str($_POST['formData'], $formData);
+        $email = sanitize_email($formData['email']);
+        $name = sanitize_text_field($formData['name']);
+
+        $email_manager = new GSC_Email_Manager();
+        $result = $email_manager->add_email($email, $name);
+
+        if ($result) {
+            wp_send_json_success('Email saved successfully');
+        } else {
+            wp_send_json_error('Failed to save email');
+        }
+    } else {
+        wp_send_json_error('Invalid data');
+    }
 }
