@@ -53,6 +53,13 @@ class GSC_Email_Manager {
         return $wpdb->get_results($sql);
     }
 
+    public function get_email($email) {
+        global $wpdb;
+    
+        $sql = $wpdb->prepare("SELECT * FROM $this->table_name WHERE email = %s", $email);
+        return $wpdb->get_row($sql);
+    }
+
     public function export_csv() {
         global $wpdb;
 

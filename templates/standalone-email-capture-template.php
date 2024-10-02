@@ -10,6 +10,9 @@ if (!defined('ABSPATH')) {
 
 $post_id = get_the_ID();
 $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
+
+// Check if user is logged in
+$is_logged_in = isset($_SESSION['gsc_user_email']);
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -54,6 +57,18 @@ $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
             justify-content: center;
             margin-bottom: 1rem;
         }
+        .gsc-signout-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4285f4;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .gsc-signout-button:hover {
+            background-color: #357ae8;
+        }
         <?php 
         if (!empty($custom_css)) {
             echo wp_kses_post($custom_css);
@@ -65,26 +80,35 @@ $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
 <body <?php body_class(); ?>>
     <div class="gsc-email-capture-container">
         <div class="gsc-email-capture-form">
-            <h2>Sign In / Sign Up with Google</h2>
-            <p>Use your Google account to sign in or sign up.</p>
-
-            <div id="g_id_onload"
-                 data-client_id="<?php echo esc_attr(get_option('gsc_google_client_id')); ?>"
-                 data-callback="handleCredentialResponse">
-            </div>
-            <div class="g_id_signin"
-                 data-type="standard"
-                 data-size="large"
-                 data-theme="outline"
-                 data-text="sign_in_with"
-                 data-shape="rectangular"
-                 data-logo_alignment="left">
-            </div>
+            <?php if ($is_logged_in): ?>
+                <h2 style="color: #fff;">Welcome, <?php echo esc_html($_SESSION['gsc_user_name']); ?>!</h2>
+                <p>You are currently signed in with Google.</p>
+                <button onclick="signOut()" class="gsc-signout-button">Sign Out</button>
+            <?php else: ?>
+                <h2 style="color: #fff;">Sign In / Sign Up with Google</h2>
+                <p>Use your Google account to sign in or sign up.</p>
+                
+                <div style=" display: flex; flex-direction: row; justify-content: center; ">
+                    <div id="g_id_onload"
+                        data-client_id="<?php echo esc_attr(get_option('gsc_google_client_id')); ?>"
+                        data-callback="handleCredentialResponse">
+                    </div>
+                    <div class="g_id_signin"
+                        data-type="standard"
+                        data-size="large"
+                        data-theme="outline"
+                        data-text="sign_in_with"
+                        data-shape="rectangular"
+                        data-logo_alignment="left">
+                    </div>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
 
     <script>
     function handleCredentialResponse(response) {
+        console.log('Google response received:', response);
         // Send the ID token to your server
         fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
             method: 'POST',
@@ -93,17 +117,53 @@ $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
             },
             body: 'action=gsc_verify_google_token&token=' + response.credential
         })
-        .then(res => res.json())
+        .then(res => {
+            console.log('Server response status:', res.status);
+            return res.json();
+        })
         .then(data => {
+            console.log('Server response data:', data);
             if (data.success) {
-                window.location.href = '<?php echo esc_js(get_option('gsc_thank_you_url', home_url())); ?>';
+                if (data.is_new_user) {
+                    console.log('New user detected. Redirecting to:', data.thank_you_url);
+                    window.location.href = data.thank_you_url;
+                } else {
+                    console.log('Existing user detected. Reloading page.');
+                    window.location.reload();
+                }
             } else {
+                console.error('Authentication failed:', data.message);
                 alert('Authentication failed. Please try again.');
             }
         })
         .catch(error => {
-            console.error('Error:', error);
+            console.error('Fetch error:', error);
             alert('An error occurred. Please try again.');
+        });
+    }
+
+    function signOut() {
+        fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=gsc_google_signout'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Sign out from Google
+                google.accounts.id.disableAutoSelect();
+                // Reload the page to show logged-out state
+                window.location.reload();
+            } else {
+                alert('Sign out failed. Please try again.');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred during sign out. Please try again.');
         });
     }
     </script>
