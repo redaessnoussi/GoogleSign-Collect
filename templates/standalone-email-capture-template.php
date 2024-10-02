@@ -69,6 +69,15 @@ $is_logged_in = isset($_SESSION['gsc_user_email']);
         .gsc-signout-button:hover {
             background-color: #357ae8;
         }
+        .gsc-custom-content {
+            text-align: center;
+            padding: 24px;
+            background-color: #fff;
+        }
+        .gsc-custom-content img {
+            max-width: 100%;
+            height: auto;
+        }
         <?php 
         if (!empty($custom_css)) {
             echo wp_kses_post($custom_css);
@@ -79,6 +88,16 @@ $is_logged_in = isset($_SESSION['gsc_user_email']);
 </head>
 <body <?php body_class(); ?>>
     <div class="gsc-email-capture-container">
+        <div class="gsc-custom-content">
+            <?php
+            // Display the custom content
+            while (have_posts()) :
+                the_post();
+                the_content();
+            endwhile;
+            ?>
+        </div>
+
         <div class="gsc-email-capture-form">
             <?php if ($is_logged_in): ?>
                 <h2 style="color: #fff;">Welcome, <?php echo esc_html($_SESSION['gsc_user_name']); ?>!</h2>
