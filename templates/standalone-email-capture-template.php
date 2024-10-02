@@ -124,15 +124,20 @@ $is_logged_in = isset($_SESSION['gsc_user_email']);
         .then(data => {
             console.log('Server response data:', data);
             if (data.success) {
-                if (data.is_new_user) {
-                    console.log('New user detected. Redirecting to:', data.thank_you_url);
-                    window.location.href = data.thank_you_url;
+                console.log('Authentication successful');
+                console.log('Is new user:', data.data.is_new_user);
+                console.log('Thank you URL:', data.data.thank_you_url);
+                if (data.data.is_new_user) {
+                    console.log('New user detected. Redirecting to:', data.data.thank_you_url);
+                    window.location.href = data.data.thank_you_url;
+                    alert('New user detected. Redirecting to:', data.data.thank_you_url);
                 } else {
                     console.log('Existing user detected. Reloading page.');
                     window.location.reload();
+                    alert('Existing user detected. Reloading page.');
                 }
             } else {
-                console.error('Authentication failed:', data.message);
+                console.error('Authentication failed:', data.data.message);
                 alert('Authentication failed. Please try again.');
             }
         })

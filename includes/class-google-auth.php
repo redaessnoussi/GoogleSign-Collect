@@ -23,6 +23,7 @@ class GSC_Google_Auth {
     }
 
     public function verify_google_token() {
+        error_log('Verify Google Token method called');
         $token = $_POST['token'];
     
         $client = new WP_Http();
@@ -51,6 +52,9 @@ class GSC_Google_Auth {
         $user_email = $body['email'];
         $user_name = $body['name'];
     
+        error_log('User email: ' . $user_email);
+        error_log('User name: ' . $user_name);
+    
         $_SESSION['gsc_user_email'] = $user_email;
         $_SESSION['gsc_user_name'] = $user_name;
     
@@ -65,15 +69,20 @@ class GSC_Google_Auth {
     
         if ($result === false) {
             error_log('Failed to save/update email: ' . $user_email);
+        } else {
+            error_log('Email saved/updated successfully');
         }
     
         $thank_you_url = get_option('gsc_thank_you_url', home_url());
         error_log('Thank you URL: ' . $thank_you_url);
     
-        wp_send_json_success(array(
+        $response_data = array(
             'message' => 'Authentication successful',
             'is_new_user' => $is_new_user,
             'thank_you_url' => $thank_you_url
-        ));
+        );
+        error_log('Response data: ' . print_r($response_data, true));
+    
+        wp_send_json_success($response_data);
     }
 }
