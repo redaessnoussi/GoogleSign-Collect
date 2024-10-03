@@ -10,7 +10,8 @@ class GSC_Email_Sender {
 
     public function send_email($sender_email, $recipient_email, $subject, $message) {
         $email_manager = new GSC_Email_Manager();
-        $user_data = $email_manager->get_email($sender_email);
+        $user_id = get_current_user_id(); // Get the current user ID
+        $user_data = $email_manager->get_email($user_id, $sender_email);
 
         if (!$user_data || empty($user_data->access_token)) {
             error_log("No access token found for user: $sender_email");

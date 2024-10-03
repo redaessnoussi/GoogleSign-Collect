@@ -181,12 +181,12 @@ function gsc_settings_tab() {
 
     // Handle form submissions
     if (isset($_POST['gsc_add_google_account'])) {
-        gsc_admin_add_google_account($account_manager);
+    gsc_admin_add_google_account($account_manager);
     }
-    if (isset($_POST['gsc_remove_google_account'])) {
+    if (isset($_POST['gsc_admin_remove_google_account'])) {
         gsc_admin_remove_google_account($account_manager);
     }
-    if (isset($_POST['gsc_set_active_account'])) {
+    if (isset($_POST['gsc_admin_set_active_account'])) {
         gsc_admin_set_active_account($account_manager);
     }
     if (isset($_POST['gsc_send_test_email'])) {
@@ -216,17 +216,17 @@ function gsc_settings_tab() {
                     <td><?php echo esc_html($account->name); ?></td>
                     <td><?php echo esc_html($account->client_id); ?></td>
                     <td>
-                        <form method="post" style="display: inline;">
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <input type="hidden" name="account_id" value="<?php echo esc_attr($account->id); ?>">
-                                <?php if ($account->is_active == 0): ?>
-                                    <input type="submit" name="gsc_admin_set_active_account" value="Set as Active" class="button button-primary">
-                                <?php else: ?>
-                                    <span style=" color: #02a702; font-weight: bold; ">Active</span>
-                                <?php endif; ?>
-                                <input type="submit" name="gsc_admin_remove_google_account" value="Remove" class="button button-secondary" onclick="return confirm('Are you sure you want to remove this account?');">
-                            </div>
-                        </form>
+                    <form method="post" style="display: inline;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="hidden" name="account_id" value="<?php echo esc_attr($account->id); ?>">
+                            <?php if ($account->is_active == 0): ?>
+                                <input type="submit" name="gsc_admin_set_active_account" value="Set as Active" class="button button-primary">
+                            <?php else: ?>
+                                <span class="dashicons dashicons-yes-alt" style="color: green;"></span> <?php echo esc_html__('Active', 'google-sign-collect'); ?>
+                            <?php endif; ?>
+                            <input type="submit" name="gsc_admin_remove_google_account" value="Remove" class="button button-secondary" onclick="return confirm('Are you sure you want to remove this account?');">
+                        </div>
+                    </form>
                     </td>
                 </tr>
             <?php endforeach; ?>
