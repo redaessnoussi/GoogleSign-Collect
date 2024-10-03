@@ -330,6 +330,10 @@ function gsc_admin_set_active_account($account_manager) {
     } else {
         add_settings_error('gsc_messages', 'gsc_message', 'Failed to update active Google Cloud account.', 'error');
     }
+
+    // Force a page reload to reflect the changes
+    wp_redirect(add_query_arg('settings-updated', 'true', wp_get_referer()));
+    exit;
 }
 
 function gsc_send_test_email() {

@@ -39,6 +39,9 @@ class GSC_Email_Manager {
 
     public function add_or_update_email($user_id, $account_id, $email, $name = '', $access_token = '', $refresh_token = '', $token_expiry = '') {
         global $wpdb;
+
+        error_log("Adding/Updating email: $email for user: $user_id");
+        error_log("Access token: " . substr($access_token, 0, 20) . '...');
     
         if (empty($email) || !is_email($email)) {
             error_log("Invalid email provided: $email");
@@ -50,26 +53,28 @@ class GSC_Email_Manager {
             'account_id' => $account_id,
             'email' => sanitize_email($email),
             'name' => sanitize_text_field($name),
-            'access_token' => sanitize_text_field($access_token),
-            'refresh_token' => sanitize_text_field($refresh_token),
-            'token_expiry' => sanitize_text_field($token_expiry),
+            'access_token' => $access_token,
+            'refresh_token' => $refresh_token,
+            'token_expiry' => $token_expiry,
             'updated_at' => current_time('mysql')
         );
     
         $format = array('%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s');
     
         $existing_email = $this->get_email($user_id, $email);
-    
+
         if ($existing_email) {
             $result = $wpdb->update($this->table_name, $data, array('user_id' => $user_id, 'email' => $email), $format, array('%d', '%s'));
+            error_log("Updating existing email. Result: " . ($result !== false ? 'success' : 'failure'));
         } else {
             $data['created_at'] = current_time('mysql');
             $format[] = '%s';
             $result = $wpdb->insert($this->table_name, $data, $format);
+            error_log("Inserting new email. Result: " . ($result !== false ? 'success' : 'failure'));
         }
-    
+
         if ($result === false) {
-            error_log("Database error occurred while " . ($existing_email ? "updating" : "inserting") . " email: " . $wpdb->last_error);
+            error_log("Database error occurred: " . $wpdb->last_error);
             return false;
         }
     
@@ -186,4 +191,11 @@ class GSC_Email_Manager {
         
         return $results;
     }
+
+    public function get_email_by_address($email) {
+        global $wpdb;
+        $sql = $wpdb->prepare("SELECT * FROM $this->table_name WHERE email = %s", $email);
+        return $wpdb->get_row($sql);
+    }
+
 }

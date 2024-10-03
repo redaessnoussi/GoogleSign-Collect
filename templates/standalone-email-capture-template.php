@@ -170,9 +170,7 @@ function sendTokenToServer(idToken) {
     formData.append('token', idToken);
     formData.append('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
-    console.log('action', 'gsc_verify_google_token');
-    console.log('token', idToken);
-    console.log('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
+    console.log('Sending token to server:', idToken.substring(0, 20) + '...');
 
     fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
         method: 'POST',
@@ -180,13 +178,16 @@ function sendTokenToServer(idToken) {
     })
     .then(res => res.json())
     .then(data => {
-        console.log("data:", data)
+        console.log("Server response:", data);
         if (data.success) {
             if (data.data.is_new_user) {
                 requestAdditionalScopes();
             } else {
                 window.location.reload();
             }
+        } else {
+            console.error('Error from server:', data.data);
+            alert('Authentication failed. Please try again.');
         }
     })
     .catch(error => {

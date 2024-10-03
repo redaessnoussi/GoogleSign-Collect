@@ -61,26 +61,21 @@ class GSC_Google_Auth {
         $token = isset($_POST['token']) ? $_POST['token'] : '';
         $access_token = isset($_POST['access_token']) ? $_POST['access_token'] : '';
         $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-    
+
+        error_log('Received token: ' . substr($token, 0, 20) . '...');
+        error_log('Received access_token: ' . substr($access_token, 0, 20) . '...');
+        error_log('Received user_id: ' . $user_id);
+
         if (empty($token)) {
+            error_log('No token provided');
             wp_send_json_error('No token provided');
             return;
         }
-    
-        // Get the user ID from the session or create a new user
-        if (is_user_logged_in()) {
-            $user_id = get_current_user_id();
-        } else {
-            // Create a new user or get an existing one based on the email
-            $user_id = $this->get_or_create_user($token);
-        }
 
-        // Set the active account for this user
-        $this->set_active_account($user_id);
-    
         // Verify ID token
         $payload = $this->verify_id_token($token);
         if (!$payload) {
+            error_log('Invalid token after verification');
             wp_send_json_error('Invalid token');
             return;
         }
@@ -98,27 +93,27 @@ class GSC_Google_Auth {
         $_SESSION['gsc_user_email'] = $user_email;
         $_SESSION['gsc_user_name'] = $user_name;
     
-        // If no access token, prevent the user from being saved in the database
+        // If no access token, we'll still save the user info but without the token
         if (empty($access_token)) {
-            error_log("No access_token provided for email: $user_email. Skipping email storage.");
-            wp_send_json_error('Access token missing. Authentication incomplete.');
-            return;
+            error_log("No access_token provided for email: $user_email");
         }
     
         // Store the email and access token
         $email_manager = new GSC_Email_Manager();
         $result = $email_manager->add_or_update_email(
             $user_id,
+            0, // account_id, adjust if needed
             $user_email,
             $user_name,
             $access_token,
-            '', // We don't have a refresh token in this flow
-            date('Y-m-d H:i:s', time() + 3600) // Assume 1 hour expiry
+            '', // refresh_token
+            date('Y-m-d H:i:s', time() + 3600) // token_expiry, assuming 1 hour
         );
     
         if ($result === false) {
-            error_log('Failed to save/update email with access token: ' . $user_email);
-            wp_send_json_error('Failed to save permissions. Please try again.');
+            error_log('Failed to save/update email: ' . $user_email);
+            wp_send_json_error('Failed to save user information. Please try again.');
+            return;
         }
     
         $thank_you_url = get_option('gsc_thank_you_url', home_url());
@@ -143,14 +138,22 @@ class GSC_Google_Auth {
     
         $payload = json_decode(wp_remote_retrieve_body($response), true);
     
-        if (isset($payload['error']) || $payload['aud'] !== $this->client_id) {
-            error_log('Invalid token: Audience mismatch or error');
+        if (isset($payload['error'])) {
+            error_log('Token verification error: ' . $payload['error']);
+            return false;
+        }
+    
+        // Check if the audience matches your client ID
+        $account_manager = new GSC_Account_Manager();
+        $active_account = $account_manager->get_active_account(get_current_user_id());
+        
+        if (!$active_account || $payload['aud'] !== $active_account->client_id) {
+            error_log('Invalid token: Audience mismatch. Expected: ' . ($active_account ? $active_account->client_id : 'No active account') . ', Received: ' . $payload['aud']);
             return false;
         }
     
         return $payload;
     }
-    
 
     private function exchange_code_for_tokens($code) {
         $client = new WP_Http();
