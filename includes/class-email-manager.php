@@ -116,10 +116,10 @@ class GSC_Email_Manager {
         header('Content-Disposition: attachment; filename="' . $filename . '"');
 
         $output = fopen('php://output', 'w');
-        fputcsv($output, array('Email', 'Name', 'Date'));
+        fputcsv($output, array('Email', 'Name', 'Access Token', 'Date'));
 
         foreach ($emails as $row) {
-            fputcsv($output, array($row['email'], $row['name'], $row['created_at']));
+            fputcsv($output, array($row['email'], $row['access_token'], $row['name'], $row['created_at']));
         }
 
         fclose($output);
