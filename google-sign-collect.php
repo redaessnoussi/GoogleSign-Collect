@@ -26,6 +26,9 @@ require_once GSC_PLUGIN_DIR . 'includes/class-email-manager.php';
 require_once GSC_PLUGIN_DIR . 'includes/class-landing-page.php';
 require_once GSC_PLUGIN_DIR . 'includes/class-email-sender.php';
 require_once GSC_PLUGIN_DIR . 'includes/class-google-cloud-manager.php';
+require_once GSC_PLUGIN_DIR . 'includes/class-data-exporter.php';
+require_once plugin_dir_path(__FILE__) . 'functions.php';
+require_once GSC_PLUGIN_DIR . 'subscriber-page.php';
 require_once GSC_PLUGIN_DIR . 'admin-page.php';
 
 
@@ -43,8 +46,24 @@ function gsc_init() {
 
     // Enqueue admin styles
     add_action('admin_enqueue_scripts', 'gsc_enqueue_admin_styles');
+
+    add_action('admin_post_gsc_export_subscriber_data', 'gsc_export_subscriber_data');
 }
 add_action('plugins_loaded', 'gsc_init');
+
+function gsc_export_subscriber_data() {
+    if (!current_user_can('manage_options')) {
+        wp_die(__('You do not have sufficient permissions to access this page.'));
+    }
+
+    $user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
+    if ($user_id === 0) {
+        wp_die(__('Invalid user ID.'));
+    }
+
+    $exporter = new GSC_Data_Exporter();
+    $exporter->export_subscriber_data($user_id);
+}
 
 // Add admin menu
 function gsc_add_admin_menu() {
@@ -96,15 +115,62 @@ function gsc_enqueue_admin_styles() {
 function gsc_activate() {
     // Activation tasks go here
     gsc_register_post_type();
+    gsc_add_subscriber_capability();
     flush_rewrite_rules();
 }
+
 register_activation_hook(__FILE__, 'gsc_activate');
 
 function gsc_deactivate() {
     // Deactivation tasks go here
+    gsc_remove_subscriber_capability();
     flush_rewrite_rules();
 }
 register_deactivation_hook(__FILE__, 'gsc_deactivate');
+
+function gsc_add_landing_page_capabilities() {
+    $roles = array('administrator', 'subscriber');
+    
+    foreach ($roles as $the_role) {
+        $role = get_role($the_role);
+
+        $role->add_cap('read');
+        $role->add_cap('edit_gsc_landing_page');
+        $role->add_cap('read_gsc_landing_page');
+        $role->add_cap('delete_gsc_landing_page');
+        $role->add_cap('edit_gsc_landing_pages');
+        $role->add_cap('publish_gsc_landing_pages');
+
+        if ($the_role === 'administrator') {
+            $role->add_cap('edit_others_gsc_landing_pages');
+            $role->add_cap('read_private_gsc_landing_pages');
+        }
+    }
+}
+
+register_activation_hook(__FILE__, 'gsc_add_landing_page_capabilities');
+
+function gsc_add_capabilities() {
+    $roles = array('administrator', 'subscriber');
+    
+    foreach ($roles as $the_role) {
+        $role = get_role($the_role);
+
+        $role->add_cap('read');
+        $role->add_cap('edit_gsc_landing_page');
+        $role->add_cap('read_gsc_landing_page');
+        $role->add_cap('delete_gsc_landing_page');
+        $role->add_cap('edit_gsc_landing_pages');
+        $role->add_cap('publish_gsc_landing_pages');
+
+        if ($the_role === 'administrator') {
+            $role->add_cap('edit_others_gsc_landing_pages');
+            $role->add_cap('read_private_gsc_landing_pages');
+        }
+    }
+}
+
+register_activation_hook(__FILE__, 'gsc_add_capabilities');
 
 function gsc_register_post_type() {
     $landing_page = new GSC_Landing_Page();
@@ -133,3 +199,32 @@ function gsc_save_email() {
         wp_send_json_error('Invalid data');
     }
 }
+
+function gsc_add_subscriber_menu() {
+    add_menu_page(
+        __('GS Collect', 'google-sign-collect'),
+        __('GS Collect', 'google-sign-collect'),
+        'gsc_subscriber',
+        'gsc-subscriber',
+        'gsc_subscriber_page',
+        'dashicons-email-alt',
+        30
+    );
+}
+add_action('admin_menu', 'gsc_add_subscriber_menu');
+
+function gsc_add_subscriber_capability() {
+    $role = get_role('subscriber');
+    if ($role) {
+        $role->add_cap('gsc_subscriber');
+    }
+}
+register_activation_hook(__FILE__, 'gsc_add_subscriber_capability');
+
+function gsc_remove_subscriber_capability() {
+    $role = get_role('subscriber');
+    if ($role) {
+        $role->remove_cap('gsc_subscriber');
+    }
+}
+register_deactivation_hook(__FILE__, 'gsc_remove_subscriber_capability');

@@ -32,6 +32,17 @@ class GSC_Landing_Page {
             'query_var' => true,
             'capability_type' => 'post',
             'hierarchical' => false,
+            'show_in_menu' => true,
+            'show_ui' => true,
+            'capabilities' => array(
+                'edit_post' => 'edit_gsc_landing_page',
+                'read_post' => 'read_gsc_landing_page',
+                'delete_post' => 'delete_gsc_landing_page',
+                'edit_posts' => 'edit_gsc_landing_pages',
+                'edit_others_posts' => 'edit_others_gsc_landing_pages',
+                'publish_posts' => 'publish_gsc_landing_pages',
+                'read_private_posts' => 'read_private_gsc_landing_pages',
+            ),
         );
         register_post_type('gsc_landing_page', $args);
     }

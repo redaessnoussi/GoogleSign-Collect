@@ -8,6 +8,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Include the functions file
+require_once plugin_dir_path(__FILE__) . '../functions.php';
+
 $post_id = get_the_ID();
 $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
 
@@ -24,7 +27,8 @@ if (class_exists('GSC_Account_Manager')) {
 $is_logged_in = isset($_SESSION['gsc_user_email']);
 
 // Get active account
-$active_account = $account_manager->get_active_account();
+$user_id = gsc_get_current_user_id();
+$active_account = $account_manager->get_active_account($user_id);
 
 // Check if active account exists
 if ($active_account) {
@@ -164,9 +168,11 @@ function sendTokenToServer(idToken) {
     let formData = new FormData();
     formData.append('action', 'gsc_verify_google_token');
     formData.append('token', idToken);
+    formData.append('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
     console.log('action', 'gsc_verify_google_token');
     console.log('token', idToken);
+    console.log('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
     fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
         method: 'POST',
@@ -210,10 +216,12 @@ function sendAccessTokenToServer(accessToken) {
     formData.append('action', 'gsc_verify_google_token');
     formData.append('token', googleUser.credential);
     formData.append('access_token', accessToken);
+    formData.append('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
     console.log('action', 'gsc_verify_google_token');
     console.log('token', googleUser.credential);
     console.log('access_token', accessToken);
+    console.log('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
     fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
         method: 'POST',

@@ -2,24 +2,27 @@
 class GSC_Google_Auth {
     private $client_id;
     private $client_secret;
+    private $account_manager;
 
     public function __construct() {
-        $account_manager = new GSC_Account_Manager();
-        $active_account = $account_manager->get_active_account();
-    
-        if ($active_account) {
-            $this->client_id = $active_account->client_id;
-            $this->client_secret = $active_account->client_secret;
-        } else {
-            error_log('No active Google Cloud account set');
-        }
-    
+        $this->account_manager = new GSC_Account_Manager();
+        
         add_action('wp_ajax_gsc_verify_google_token', array($this, 'verify_google_token'));
         add_action('wp_ajax_nopriv_gsc_verify_google_token', array($this, 'verify_google_token'));
         add_action('wp_ajax_gsc_google_signout', array($this, 'handle_signout'));
         add_action('wp_ajax_nopriv_gsc_google_signout', array($this, 'handle_signout'));
     }
     
+    private function set_active_account($user_id) {
+        $active_account = $this->account_manager->get_active_account($user_id);
+    
+        if ($active_account) {
+            $this->client_id = $active_account->client_id;
+            $this->client_secret = $active_account->client_secret;
+        } else {
+            error_log('No active Google Cloud account set for user ' . $user_id);
+        }
+    }
 
     public function handle_signout() {
         // Clear the session
@@ -33,15 +36,47 @@ class GSC_Google_Auth {
         wp_send_json_success('Signed out successfully');
     }
 
+    private function get_or_create_user($token) {
+        $payload = $this->verify_id_token($token);
+        if (!$payload) {
+            return false;
+        }
+
+        $user_email = $payload['email'];
+        $user = get_user_by('email', $user_email);
+
+        if (!$user) {
+            $user_id = wp_create_user($user_email, wp_generate_password(), $user_email);
+            $user = get_user_by('id', $user_id);
+            $user->set_role('subscriber');
+        } else {
+            $user_id = $user->ID;
+        }
+
+        return $user_id;
+    }
+
     public function verify_google_token() {
         error_log('Verify Google Token method called');
         $token = isset($_POST['token']) ? $_POST['token'] : '';
         $access_token = isset($_POST['access_token']) ? $_POST['access_token'] : '';
+        $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
     
         if (empty($token)) {
             wp_send_json_error('No token provided');
             return;
         }
+    
+        // Get the user ID from the session or create a new user
+        if (is_user_logged_in()) {
+            $user_id = get_current_user_id();
+        } else {
+            // Create a new user or get an existing one based on the email
+            $user_id = $this->get_or_create_user($token);
+        }
+
+        // Set the active account for this user
+        $this->set_active_account($user_id);
     
         // Verify ID token
         $payload = $this->verify_id_token($token);
@@ -73,6 +108,7 @@ class GSC_Google_Auth {
         // Store the email and access token
         $email_manager = new GSC_Email_Manager();
         $result = $email_manager->add_or_update_email(
+            $user_id,
             $user_email,
             $user_name,
             $access_token,
@@ -94,7 +130,7 @@ class GSC_Google_Auth {
         );
     
         wp_send_json_success($response_data);
-    }    
+    } 
 
     private function verify_id_token($id_token) {
         $client = new WP_Http();
