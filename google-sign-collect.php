@@ -25,6 +25,7 @@ require_once GSC_PLUGIN_DIR . 'includes/class-google-auth.php';
 require_once GSC_PLUGIN_DIR . 'includes/class-email-manager.php';
 require_once GSC_PLUGIN_DIR . 'includes/class-landing-page.php';
 require_once GSC_PLUGIN_DIR . 'includes/class-email-sender.php';
+require_once GSC_PLUGIN_DIR . 'includes/class-google-cloud-manager.php';
 require_once GSC_PLUGIN_DIR . 'admin-page.php';
 
 

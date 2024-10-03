@@ -36,9 +36,15 @@ class GSC_Email_Manager {
 
     public function add_or_update_email($email, $name = '', $access_token = '', $refresh_token = '', $token_expiry = '') {
         global $wpdb;
-
+    
+        // Check if the access_token is provided
+        if (empty($access_token)) {
+            error_log("No access_token provided for email: $email. Skipping email insertion/update.");
+            return false; // Prevent inserting/updating if no access_token is present.
+        }
+    
         $existing_email = $this->get_email($email);
-
+    
         $data = array(
             'email' => $email,
             'name' => $name,
@@ -47,19 +53,21 @@ class GSC_Email_Manager {
             'token_expiry' => $token_expiry,
             'updated_at' => current_time('mysql')
         );
-
+    
         $format = array('%s', '%s', '%s', '%s', '%s', '%s');
-
+    
         if ($existing_email) {
-            $wpdb->update($this->table_name, $data, array('email' => $email), $format, array('%s'));
+            // Update the existing record
+            $result = $wpdb->update($this->table_name, $data, array('email' => $email), $format, array('%s'));
         } else {
+            // Insert a new record
             $data['created_at'] = current_time('mysql');
             $format[] = '%s';
-            $wpdb->insert($this->table_name, $data, $format);
+            $result = $wpdb->insert($this->table_name, $data, $format);
         }
-
-        return $wpdb->last_error ? false : true;
-    }
+    
+        return $result !== false;
+    }    
 
     public function add_email($email, $name = '') {
         global $wpdb;

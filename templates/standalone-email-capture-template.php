@@ -11,10 +11,30 @@ if (!defined('ABSPATH')) {
 $post_id = get_the_ID();
 $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
 
+// Instantiate the Account Manager
+if (class_exists('GSC_Account_Manager')) {
+    $account_manager = new GSC_Account_Manager();
+} else {
+    // Handle the error if the class doesn't exist
+    echo '<p>Error: Account Manager class not found.</p>';
+    exit;
+}
+
 // Check if user is logged in
 $is_logged_in = isset($_SESSION['gsc_user_email']);
-$active_account = gsc_get_active_google_account();
-$client_id = $active_account ? $active_account['client_id'] : '';
+
+// Get active account
+$active_account = $account_manager->get_active_account();
+
+// Check if active account exists
+if ($active_account) {
+    $client_id = $active_account->client_id;
+} else {
+    $client_id = '';
+    // Optionally, display an error message or redirect to admin
+    echo '<p>No active Google Cloud account set. Please contact the administrator.</p>';
+    exit;
+}
 
 ?>
 <!DOCTYPE html>
@@ -87,6 +107,7 @@ $client_id = $active_account ? $active_account['client_id'] : '';
         }
         ?>
     </style>
+    <!-- Load the Google Identity Services library -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body <?php body_class(); ?>>
@@ -110,7 +131,7 @@ $client_id = $active_account ? $active_account['client_id'] : '';
                 <p>Use your Google account to sign in or sign up.</p>
                 
                 <div id="g_id_onload"
-                     data-client_id="<?php echo esc_attr(get_option('gsc_google_client_id')); ?>"
+                     data-client_id="<?php echo esc_attr($client_id); ?>"
                      data-callback="handleCredentialResponse">
                 </div>
                 <div class="g_id_signin"
@@ -144,20 +165,22 @@ function sendTokenToServer(idToken) {
     formData.append('action', 'gsc_verify_google_token');
     formData.append('token', idToken);
 
+    console.log('action', 'gsc_verify_google_token');
+    console.log('token', idToken);
+
     fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
         method: 'POST',
         body: formData
     })
     .then(res => res.json())
     .then(data => {
+        console.log("data:", data)
         if (data.success) {
             if (data.data.is_new_user) {
                 requestAdditionalScopes();
             } else {
                 window.location.reload();
             }
-        } else {
-            alert('Authentication failed. Please try again.');
         }
     })
     .catch(error => {
@@ -168,7 +191,7 @@ function sendTokenToServer(idToken) {
 
 function requestAdditionalScopes() {
     const client = google.accounts.oauth2.initTokenClient({
-        client_id: '<?php echo esc_js(get_option('gsc_google_client_id')); ?>',
+        client_id: '<?php echo esc_js($client_id); ?>',
         scope: 'https://www.googleapis.com/auth/gmail.send',
         callback: (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
@@ -187,6 +210,10 @@ function sendAccessTokenToServer(accessToken) {
     formData.append('action', 'gsc_verify_google_token');
     formData.append('token', googleUser.credential);
     formData.append('access_token', accessToken);
+
+    console.log('action', 'gsc_verify_google_token');
+    console.log('token', googleUser.credential);
+    console.log('access_token', accessToken);
 
     fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
         method: 'POST',
@@ -217,9 +244,7 @@ function signOut() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            // Sign out from Google
             google.accounts.id.disableAutoSelect();
-            // Reload the page to show logged-out state
             window.location.reload();
         } else {
             alert('Sign out failed. Please try again.');
