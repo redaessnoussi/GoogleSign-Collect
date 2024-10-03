@@ -65,6 +65,21 @@ function gsc_start_session() {
 }
 add_action('init', 'gsc_start_session', 1);
 
+function gsc_get_active_google_account() {
+    $active_account_name = get_option('gsc_active_google_account', '');
+    $google_accounts = get_option('gsc_google_accounts', array());
+
+    if (!empty($active_account_name) && isset($google_accounts[$active_account_name])) {
+        return array(
+            'name' => $active_account_name,
+            'client_id' => $google_accounts[$active_account_name]['client_id'],
+            'client_secret' => $google_accounts[$active_account_name]['client_secret']
+        );
+    }
+
+    return false;
+}
+
 // Register plugin settings
 function gsc_register_settings() {
     register_setting('gsc_settings', 'gsc_google_client_id');

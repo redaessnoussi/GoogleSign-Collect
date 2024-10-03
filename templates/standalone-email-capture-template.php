@@ -13,6 +13,9 @@ $custom_css = get_post_meta($post_id, '_gsc_custom_css', true);
 
 // Check if user is logged in
 $is_logged_in = isset($_SESSION['gsc_user_email']);
+$active_account = gsc_get_active_google_account();
+$client_id = $active_account ? $active_account['client_id'] : '';
+
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>

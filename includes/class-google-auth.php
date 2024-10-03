@@ -4,6 +4,15 @@ class GSC_Google_Auth {
     private $client_secret;
 
     public function __construct() {
+        $active_account = gsc_get_active_google_account();
+        if ($active_account) {
+            $this->client_id = $active_account['client_id'];
+            $this->client_secret = $active_account['client_secret'];
+        } else {
+            // Handle the case where no active account is set
+            error_log('No active Google Cloud account set');
+        }
+        
         $this->client_id = get_option('gsc_google_client_id');
         $this->client_secret = get_option('gsc_google_client_secret');
         add_action('wp_ajax_gsc_verify_google_token', array($this, 'verify_google_token'));
