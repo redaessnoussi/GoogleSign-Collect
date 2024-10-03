@@ -97,7 +97,6 @@ $is_logged_in = isset($_SESSION['gsc_user_email']);
             endwhile;
             ?>
         </div>
-
         <div class="gsc-email-capture-form">
             <?php if ($is_logged_in): ?>
                 <h2 style="color: #fff;">Welcome, <?php echo esc_html($_SESSION['gsc_user_name']); ?>!</h2>
@@ -107,91 +106,129 @@ $is_logged_in = isset($_SESSION['gsc_user_email']);
                 <h2 style="color: #fff;">Sign In / Sign Up with Google</h2>
                 <p>Use your Google account to sign in or sign up.</p>
                 
-                <div style=" display: flex; flex-direction: row; justify-content: center; ">
-                    <div id="g_id_onload"
-                        data-client_id="<?php echo esc_attr(get_option('gsc_google_client_id')); ?>"
-                        data-callback="handleCredentialResponse">
-                    </div>
-                    <div class="g_id_signin"
-                        data-type="standard"
-                        data-size="large"
-                        data-theme="outline"
-                        data-text="sign_in_with"
-                        data-shape="rectangular"
-                        data-logo_alignment="left">
-                    </div>
+                <div id="g_id_onload"
+                     data-client_id="<?php echo esc_attr(get_option('gsc_google_client_id')); ?>"
+                     data-callback="handleCredentialResponse">
+                </div>
+                <div class="g_id_signin"
+                     data-type="standard"
+                     data-size="large"
+                     data-theme="outline"
+                     data-text="sign_in_with"
+                     data-shape="rectangular"
+                     data-logo_alignment="left">
+                </div>
+                <div id="manual-auth" style="display: none; margin-top: 20px;">
+                    <p>If the popup is blocked, please click the button below to grant permissions:</p>
+                    <button onclick="requestAdditionalScopes()" class="gsc-submit-button">Grant Email Permissions</button>
                 </div>
             <?php endif; ?>
         </div>
     </div>
 
     <script>
-    function handleCredentialResponse(response) {
-        console.log('Google response received:', response);
-        // Send the ID token to your server
-        fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=gsc_verify_google_token&token=' + response.credential
-        })
-        .then(res => {
-            console.log('Server response status:', res.status);
-            return res.json();
-        })
-        .then(data => {
-            console.log('Server response data:', data);
-            if (data.success) {
-                console.log('Authentication successful');
-                console.log('Is new user:', data.data.is_new_user);
-                console.log('Thank you URL:', data.data.thank_you_url);
-                if (data.data.is_new_user) {
-                    console.log('New user detected. Redirecting to:', data.data.thank_you_url);
-                    window.location.href = data.data.thank_you_url;
-                    alert('New user detected. Redirecting to:', data.data.thank_you_url);
-                } else {
-                    console.log('Existing user detected. Reloading page.');
-                    window.location.reload();
-                    alert('Existing user detected. Reloading page.');
-                }
-            } else {
-                console.error('Authentication failed:', data.data.message);
-                alert('Authentication failed. Please try again.');
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
-            alert('An error occurred. Please try again.');
-        });
-    }
+let googleUser = null;
 
-    function signOut() {
-        fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=gsc_google_signout'
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                // Sign out from Google
-                google.accounts.id.disableAutoSelect();
-                // Reload the page to show logged-out state
+function handleCredentialResponse(response) {
+    console.log('Credential response:', response);
+    googleUser = response;
+    document.getElementById('manual-auth').style.display = 'block';
+    sendTokenToServer(response.credential);
+}
+
+function sendTokenToServer(idToken) {
+    let formData = new FormData();
+    formData.append('action', 'gsc_verify_google_token');
+    formData.append('token', idToken);
+
+    fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            if (data.data.is_new_user) {
+                requestAdditionalScopes();
+            } else {
                 window.location.reload();
-            } else {
-                alert('Sign out failed. Please try again.');
             }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred during sign out. Please try again.');
-        });
-    }
-    </script>
+        } else {
+            alert('Authentication failed. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
+}
 
-    <?php wp_footer(); ?>
+function requestAdditionalScopes() {
+    const client = google.accounts.oauth2.initTokenClient({
+        client_id: '<?php echo esc_js(get_option('gsc_google_client_id')); ?>',
+        scope: 'https://www.googleapis.com/auth/gmail.send',
+        callback: (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+                sendAccessTokenToServer(tokenResponse.access_token);
+            } else {
+                console.error('Failed to obtain access token');
+                alert('Failed to obtain necessary permissions. Please try again.');
+            }
+        },
+    });
+    client.requestAccessToken({ prompt: 'consent' });
+}
+
+function sendAccessTokenToServer(accessToken) {
+    let formData = new FormData();
+    formData.append('action', 'gsc_verify_google_token');
+    formData.append('token', googleUser.credential);
+    formData.append('access_token', accessToken);
+
+    fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = data.data.thank_you_url;
+        } else {
+            alert('Failed to save permissions. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred. Please try again.');
+    });
+}
+
+function signOut() {
+    fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=gsc_google_signout'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Sign out from Google
+            google.accounts.id.disableAutoSelect();
+            // Reload the page to show logged-out state
+            window.location.reload();
+        } else {
+            alert('Sign out failed. Please try again.');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred during sign out. Please try again.');
+    });
+}
+</script>
+
+<?php wp_footer(); ?>
 </body>
 </html>

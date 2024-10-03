@@ -22,6 +22,9 @@ class GSC_Email_Manager {
             id mediumint(9) NOT NULL AUTO_INCREMENT,
             email varchar(100) NOT NULL UNIQUE,
             name varchar(100),
+            access_token text,
+            refresh_token text,
+            token_expiry datetime,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY  (id)
@@ -29,6 +32,33 @@ class GSC_Email_Manager {
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql);
+    }
+
+    public function add_or_update_email($email, $name = '', $access_token = '', $refresh_token = '', $token_expiry = '') {
+        global $wpdb;
+
+        $existing_email = $this->get_email($email);
+
+        $data = array(
+            'email' => $email,
+            'name' => $name,
+            'access_token' => $access_token,
+            'refresh_token' => $refresh_token,
+            'token_expiry' => $token_expiry,
+            'updated_at' => current_time('mysql')
+        );
+
+        $format = array('%s', '%s', '%s', '%s', '%s', '%s');
+
+        if ($existing_email) {
+            $wpdb->update($this->table_name, $data, array('email' => $email), $format, array('%s'));
+        } else {
+            $data['created_at'] = current_time('mysql');
+            $format[] = '%s';
+            $wpdb->insert($this->table_name, $data, $format);
+        }
+
+        return $wpdb->last_error ? false : true;
     }
 
     public function add_email($email, $name = '') {
