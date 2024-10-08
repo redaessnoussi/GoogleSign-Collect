@@ -15,8 +15,7 @@ function gsc_admin_page() {
         <nav class="nav-tab-wrapper">
             <a href="?page=google-sign-collect&tab=settings" class="nav-tab <?php echo (!isset($_GET['tab']) || $_GET['tab'] === 'settings') ? 'nav-tab-active' : ''; ?>">Settings</a>
             <a href="?page=google-sign-collect&tab=emails" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'emails') ? 'nav-tab-active' : ''; ?>">All Collected Emails</a>
-            <a href="?page=google-sign-collect&tab=accounts" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'accounts') ? 'nav-tab-active' : ''; ?>">User Accounts</a>
-            <a href="?page=google-sign-collect&tab=subscribers" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'subscribers') ? 'nav-tab-active' : ''; ?>">Subscribers</a>
+            <a href="?page=google-sign-collect&tab=subscribers" class="nav-tab <?php echo (isset($_GET['tab']) && $_GET['tab'] === 'subscribers') ? 'nav-tab-active' : ''; ?>">Mailers</a>
         </nav>
         
         <div class="tab-content">
@@ -29,9 +28,6 @@ function gsc_admin_page() {
                     break;
                 case 'emails':
                     gsc_all_emails_tab();
-                    break;
-                case 'accounts':
-                    gsc_user_accounts_tab();
                     break;
                 case 'subscribers':
                     gsc_subscribers_tab();
@@ -47,12 +43,24 @@ function gsc_subscribers_tab() {
     $subscribers = get_users(array('role' => 'subscriber'));
     $account_manager = new GSC_Account_Manager();
     $email_manager = new GSC_Email_Manager();
+
+    $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
     ?>
-    <h2>Subscribers</h2>
+    <h2>Mailers</h2>
+    <form method="get">
+        <input type="hidden" name="page" value="google-sign-collect">
+        <input type="hidden" name="tab" value="subscribers">
+        <p class="search-box">
+            <label class="screen-reader-text" for="user-search-input">Search Mailers:</label>
+            <input type="search" id="user-search-input" name="search" value="<?php echo esc_attr($search); ?>">
+            <input type="submit" id="search-submit" class="button" value="Search Mailers">
+        </p>
+    </form>
     <table class="wp-list-table widefat fixed striped">
         <thead>
             <tr>
                 <th>Username</th>
+                <th>Name</th>
                 <th>Email</th>
                 <th>Google Cloud Accounts</th>
                 <th>Total Emails Collected</th>
@@ -60,13 +68,18 @@ function gsc_subscribers_tab() {
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($subscribers as $subscriber): ?>
-                <?php
+            <?php foreach ($subscribers as $subscriber): 
+                if ($search && stripos($subscriber->user_login, $search) === false && stripos($subscriber->user_email, $search) === false) {
+                    continue;
+                }
                 $accounts = $account_manager->get_all_accounts($subscriber->ID);
                 $total_emails = $email_manager->get_total_emails_count($subscriber->ID);
-                ?>
+                $user_info = get_userdata($subscriber->ID);
+                $display_name = $user_info->display_name ? $user_info->display_name : $subscriber->user_login;
+            ?>
                 <tr>
                     <td><?php echo esc_html($subscriber->user_login); ?></td>
+                    <td><?php echo esc_html($display_name); ?></td>
                     <td><?php echo esc_html($subscriber->user_email); ?></td>
                     <td><?php echo count($accounts); ?></td>
                     <td><?php echo $total_emails; ?></td>
@@ -112,7 +125,7 @@ function gsc_user_accounts_tab() {
     $account_manager = new GSC_Account_Manager();
     $accounts = $account_manager->get_all_accounts_admin();
     ?>
-    <h2>User Google Cloud Accounts</h2>
+    <h2>Mailer Google Cloud Accounts</h2>
     <table class="wp-list-table widefat fixed striped">
         <thead>
             <tr>
@@ -142,16 +155,25 @@ function gsc_user_accounts_tab() {
 
 function gsc_all_emails_tab() {
     $email_manager = new GSC_Email_Manager();
-    $emails = $email_manager->get_all_emails_admin(100, 0);
+    $search = isset($_GET['search']) ? sanitize_text_field($_GET['search']) : '';
+    $emails = $email_manager->get_all_emails_admin(100, 0, $search);
     ?>
     <h2>All Collected Emails</h2>
+    <form method="get">
+        <input type="hidden" name="page" value="google-sign-collect">
+        <input type="hidden" name="tab" value="emails">
+        <p class="search-box">
+            <label class="screen-reader-text" for="email-search-input">Search Emails:</label>
+            <input type="search" id="email-search-input" name="search" value="<?php echo esc_attr($search); ?>">
+            <input type="submit" id="search-submit" class="button" value="Search Emails">
+        </p>
+    </form>
     <table class="wp-list-table widefat fixed striped">
         <thead>
             <tr>
-                <th>User</th>
-                <th>User Email</th>
-                <th>Collected Email</th>
-                <th>Name</th>
+                <th>Mailer</th>
+                <th>Mailer Email</th>
+                <th>Mailer Name</th>
                 <th>Access Token</th>
                 <th>Date</th>
             </tr>
@@ -161,8 +183,7 @@ function gsc_all_emails_tab() {
                 <tr>
                     <td><?php echo esc_html($email->user_login); ?></td>
                     <td><?php echo esc_html($email->user_email); ?></td>
-                    <td><?php echo esc_html($email->email); ?></td>
-                    <td><?php echo esc_html($email->name); ?></td>
+                    <td><?php echo esc_html($email->display_name); ?></td>
                     <td><?php echo esc_html(substr($email->access_token, 0, 20) . '...'); ?></td>
                     <td><?php echo esc_html($email->created_at); ?></td>
                 </tr>

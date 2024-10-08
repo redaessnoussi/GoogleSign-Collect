@@ -154,10 +154,21 @@ class GSC_Email_Manager {
         exit;
     }
 
-     // New method for admin to get all emails
-     public function get_all_emails_admin($limit = 100, $offset = 0) {
+    // New method for admin to get all emails
+    public function get_all_emails_admin($limit = 100, $offset = 0, $search = '') {
         global $wpdb;
-        $sql = $wpdb->prepare("SELECT e.*, u.user_login, u.user_email as user_email FROM $this->table_name e JOIN {$wpdb->users} u ON e.user_id = u.ID ORDER BY e.created_at DESC LIMIT %d OFFSET %d", $limit, $offset);
+        $sql = "SELECT e.*, u.user_login, u.user_email as user_email, u.display_name 
+                FROM $this->table_name e 
+                JOIN {$wpdb->users} u ON e.user_id = u.ID";
+        
+        if ($search) {
+            $sql .= $wpdb->prepare(" WHERE u.user_login LIKE %s OR u.user_email LIKE %s OR u.display_name LIKE %s", 
+                                    "%$search%", "%$search%", "%$search%");
+        }
+        
+        $sql .= " ORDER BY e.created_at DESC LIMIT %d OFFSET %d";
+        
+        $sql = $wpdb->prepare($sql, $limit, $offset);
         return $wpdb->get_results($sql);
     }
 
