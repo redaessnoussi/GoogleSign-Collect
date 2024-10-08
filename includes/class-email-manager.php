@@ -39,9 +39,10 @@ class GSC_Email_Manager {
 
     public function add_or_update_email($user_id, $account_id, $email, $name = '', $access_token = '', $refresh_token = '', $token_expiry = '') {
         global $wpdb;
-
+    
         error_log("Adding/Updating email: $email for user: $user_id");
         error_log("Access token: " . substr($access_token, 0, 20) . '...');
+        error_log("Account ID: $account_id");
     
         if (empty($email) || !is_email($email)) {
             error_log("Invalid email provided: $email");
@@ -51,7 +52,6 @@ class GSC_Email_Manager {
         $data = array(
             'user_id' => $user_id,
             'account_id' => $account_id,
-            'email' => sanitize_email($email),
             'name' => sanitize_text_field($name),
             'access_token' => $access_token,
             'refresh_token' => $refresh_token,
@@ -59,20 +59,30 @@ class GSC_Email_Manager {
             'updated_at' => current_time('mysql')
         );
     
-        $format = array('%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s');
+        $format = array('%d', '%d', '%s', '%s', '%s', '%s', '%s');
     
-        $existing_email = $this->get_email($user_id, $email);
-
+        $existing_email = $this->get_email_by_address($email);
+    
         if ($existing_email) {
-            $result = $wpdb->update($this->table_name, $data, array('user_id' => $user_id, 'email' => $email), $format, array('%d', '%s'));
-            error_log("Updating existing email. Result: " . ($result !== false ? 'success' : 'failure'));
+            // Update existing record
+            $result = $wpdb->update(
+                $this->table_name,
+                $data,
+                array('email' => $email),
+                $format,
+                array('%s')
+            );
+            error_log("Updating existing email. Result: " . ($result !== false ? 'success' : 'failure') . ". Rows affected: $result");
         } else {
+            // Insert new record
+            $data['email'] = sanitize_email($email);
             $data['created_at'] = current_time('mysql');
             $format[] = '%s';
+            $format[] = '%s';
             $result = $wpdb->insert($this->table_name, $data, $format);
-            error_log("Inserting new email. Result: " . ($result !== false ? 'success' : 'failure'));
+            error_log("Inserting new email. Result: " . ($result !== false ? 'success' : 'failure') . ". Last insert ID: " . $wpdb->insert_id);
         }
-
+    
         if ($result === false) {
             error_log("Database error occurred: " . $wpdb->last_error);
             return false;

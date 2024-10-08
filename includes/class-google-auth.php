@@ -100,15 +100,20 @@ class GSC_Google_Auth {
     
         // Store the email and access token
         $email_manager = new GSC_Email_Manager();
+        $existing_email = $email_manager->get_email_by_address($user_email);
+        $has_access_token = $existing_email && !empty($existing_email->access_token);
+
         $result = $email_manager->add_or_update_email(
             $user_id,
-            0, // account_id, adjust if needed
+            0, // or pass the correct account_id if available
             $user_email,
             $user_name,
             $access_token,
             '', // refresh_token
             date('Y-m-d H:i:s', time() + 3600) // token_expiry, assuming 1 hour
         );
+
+        error_log('Add or update email result: ' . ($result ? 'success' : 'failure'));
     
         if ($result === false) {
             error_log('Failed to save/update email: ' . $user_email);
@@ -121,7 +126,9 @@ class GSC_Google_Auth {
     
         $response_data = array(
             'message' => 'Authentication successful',
-            'thank_you_url' => $thank_you_url
+            'thank_you_url' => $thank_you_url,
+            'is_new_user' => !$existing_email,
+            'has_access_token' => !empty($access_token)
         );
     
         wp_send_json_success($response_data);

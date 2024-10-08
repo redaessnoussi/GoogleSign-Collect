@@ -180,10 +180,10 @@ function sendTokenToServer(idToken) {
     .then(data => {
         console.log("Server response:", data);
         if (data.success) {
-            if (data.data.is_new_user) {
+            if (data.data.is_new_user || !data.data.has_access_token) {
                 requestAdditionalScopes();
             } else {
-                window.location.reload();
+                window.location.href = data.data.thank_you_url;
             }
         } else {
             console.error('Error from server:', data.data);
@@ -220,8 +220,8 @@ function sendAccessTokenToServer(accessToken) {
     formData.append('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
     console.log('action', 'gsc_verify_google_token');
-    console.log('token', googleUser.credential);
-    console.log('access_token', accessToken);
+    console.log('token', googleUser.credential.substring(0, 20) + '...');
+    console.log('access_token', accessToken.substring(0, 20) + '...');
     console.log('user_id', '<?php echo esc_js(gsc_get_current_user_id()); ?>');
 
     fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
@@ -230,9 +230,11 @@ function sendAccessTokenToServer(accessToken) {
     })
     .then(res => res.json())
     .then(data => {
+        console.log('Server response:', data);
         if (data.success) {
             window.location.href = data.data.thank_you_url;
         } else {
+            console.error('Failed to save permissions:', data.data);
             alert('Failed to save permissions. Please try again.');
         }
     })

@@ -50,16 +50,16 @@ class GSC_Landing_Page {
     public function load_landing_page_template($template) {
         global $post;
         error_log('Template include filter called');
-        error_log('Current template: ' . $template);
-        error_log('Post type: ' . (isset($post) ? $post->post_type : 'Not set'));
+        // error_log('Current template: ' . $template);
+        // error_log('Post type: ' . (isset($post) ? $post->post_type : 'Not set'));
         
         if (isset($post) && $post->post_type == 'gsc_landing_page') {
-            error_log('This is a gsc_landing_page');
+            // error_log('This is a gsc_landing_page');
             $post_id = $post->ID;
-            error_log('Post ID: ' . $post_id);
+            // error_log('Post ID: ' . $post_id);
             
             $template_slug = get_post_meta($post_id, '_gsc_template_type', true);
-            error_log('Template slug from post meta: ' . $template_slug);
+            // error_log('Template slug from post meta: ' . $template_slug);
             
             if (!$template_slug || !isset($this->templates[$template_slug])) {
                 $template_slug = 'default';
@@ -67,7 +67,7 @@ class GSC_Landing_Page {
             error_log('Final template slug: ' . $template_slug);
             
             $new_template = GSC_PLUGIN_DIR . 'templates/' . $template_slug . '-template.php';
-            error_log('Attempting to load template: ' . $new_template);
+            // error_log('Attempting to load template: ' . $new_template);
             
             if (file_exists($new_template)) {
                 error_log('Custom template found and loaded');
